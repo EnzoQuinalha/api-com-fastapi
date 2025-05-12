@@ -1,80 +1,89 @@
-from typing import Union, List
-from fastapi import FastAPI, HTTPException, Depends
-from model.db
-import Database
-
+from fastapi import FastAPI
+from model.db import Database
+from model.models import Serie, Ator, Motivo, Avaliacao, Categoria
+ 
 app = FastAPI()
-
-# Instância do banco de dados
 db = Database()
-
-@app.on_event("startup")
-def startup_event():
-    db.conectar()
-
-@app.on_event("shutdown")
-def shutdown_event():
-    db.desconectar()
-
-@app.get("/")
-def read_hello():
-    return {"Hello": "World"}
-
-@app.get('/items/{item_id}/{query}')
-def read_item(item_id: int, query: Union[str, None] = None):
-    return {'item_id': item_id, 'query': query}
-
-# Endpoints para séries
+ 
+# Rotas para séries
 @app.post("/series/")
-def create_serie(titulo: str, descricao: str, ano_lancamento: int, id_categoria: int):
-    """
-    Endpoint para cadastrar uma nova série.
-    """
-    query = """
-    INSERT INTO serie (titulo, descricao, ano_lancamento, id_categoria)
-    VALUES (%s, %s, %s, %s)
-    """
-    params = (titulo, descricao, ano_lancamento, id_categoria)
-    result = db.executar(query, params)
-    if result:
-        return {"message": "Série cadastrada com sucesso!"}
-    raise HTTPException(status_code=500, detail="Erro ao cadastrar série.")
-
-@app.get("/series/", response_model=List[dict])
-def list_series():
-    """
-    Endpoint para listar todas as séries.
-    """
-    query = """
-    SELECT s.id, s.titulo, s.descricao, s.ano_lancamento, c.nome AS categoria
-    FROM serie s
-    JOIN categoria c ON s.id_categoria = c.id
-    """
-    result = db.executar(query)
-    if result:
-        return result.fetchall()
-    raise HTTPException(status_code=500, detail="Erro ao listar séries.")
-
-# Endpoints para categorias
+def cadastrar_serie(serie: Serie):
+    db.conectar()
+    sql = "INSERT INTO serie (titulo, descricao, ano_lancamento, id_categoria) VALUES (%s, %s, %s, %s)"
+    db.executar_comando(sql, (serie.titulo, serie.descricao, serie.ano_lancamento, serie.id_categoria))
+    db.desconectar()
+    return {"message": "Série cadastrada com sucesso"}
+ 
+@app.post("/atores/")
+def cadastrar_ator(ator: Ator):
+    db.conectar()
+    sql = "INSERT INTO ator (nome) VALUES (%s)"
+    db.executar_comando(sql, (ator.nome,))
+    db.desconectar()
+    return {"message": "Ator cadastrado com sucesso"}
+ 
 @app.post("/categorias/")
-def create_categoria(nome: str):
-    """
-    Endpoint para cadastrar uma nova categoria.
-    """
-    query = "INSERT INTO categoria (nome) VALUES (%s)"
-    params = (nome,)
-    result = db.executar(query, params)
-    if result:
-        return {"message": "Categoria cadastrada com sucesso!"}
-    raise HTTPException(status_code=500, detail="Erro ao cadastrar categoria.")
-
-@app.get("/categorias/", response_model=List[dict])
-def list_categorias():
-    """
-    Endpoint para listar todas as categorias.
-    """
-    query = "SELECT * FROM categoria"
-    result = db.executar(query)
-    if result:
-        return result.fetchall()
-    raise HTTPException(status_code=500, detail="Erro ao listar categorias.")
+def adicionar_categoria(categoria: Categoria):
+    db.conectar()
+    sql = "INSERT INTO categoria (nome) VALUES (%s)"
+    db.executar_comando(sql, (categoria.nome,))
+    db.desconectar()
+    return {"message": "Categoria adicionada com sucesso"}
+ 
+@app.post("/atores/{id_ator}/series/{id_serie}")
+def associar_ator_serie(id_ator: int, id_serie: int, personagem: str):
+    db.conectar()
+    sql = "INSERT INTO ator_serie (id_ator, id_serie, personagem) VALUES (%s, %s, %s)"
+    db.executar_comando(sql, (id_ator, id_serie, personagem))
+    db.desconectar()
+    return {"message": "Ator associado à série com sucesso"}
+ 
+@app.post("/motivos/")
+def incluir_motivo(motivo: Motivo):
+    db.conectar()
+    sql = "INSERT INTO motivo_assistir (id_serie, motivo) VALUES (%s, %s)"
+    db.executar_comando(sql, (motivo.id_serie, motivo.motivo))
+    db.desconectar()
+    return {"message": "Motivo incluído com sucesso"}
+ 
+@app.post("/avaliacoes/")
+def avaliar_serie(avaliacao: Avaliacao):
+    db.conectar()
+    sql = "INSERT INTO avaliacao_serie (id_serie, nota, comentario) VALUES (%s, %s, %s)"
+    db.executar_comando(sql, (avaliacao.id_serie, avaliacao.nota, avaliacao.comentario))
+    db.desconectar()
+    return {"message": "Avaliação registrada com sucesso"}
+ 
+@app.get("/series/")
+def listar_series():
+    db.conectar()
+    sql = "SELECT * FROM serie"
+    series = db.executar_comando(sql)
+    db.desconectar()
+    return series
+ 
+@app.get("/atores/")
+def listar_autores():
+    db.conectar()
+    sql = "SELECT * FROM autor"
+    autores = db.executar_comando(sql)
+    db.desconectar()
+    return autores
+ 
+# Rotas para categorias
+@app.get("/categorias/")
+def listar_categorias():
+    db.conectar()
+    sql = "SELECT * FROM categoria"
+    categorias = db.executar_comando(sql)
+    db.desconectar()
+    return categorias
+ 
+ 
+@app.get("/avaliacoes/")
+def listar_avaliacoes():
+    db.conectar()
+    sql = "SELECT * FROM avaliacao_serie"
+    avaliacoes = db.executar_comando(sql)
+    db.desconectar()
+    return avaliacoes
