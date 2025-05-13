@@ -20,5 +20,4 @@ class Avaliacao(BaseModel):
     comentario: Optional[str]
 
 class Categoria(BaseModel):
-    id: int
     nome: str
