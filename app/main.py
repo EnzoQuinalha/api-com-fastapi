@@ -1,201 +1,106 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from typing import Type
 from model.db import Database
-from model.models import Serie, Ator, Motivo, Avaliacao, Categoria
- 
+from model.models import Serie, Ator, Motivo, Avaliacao, Categoria, BaseModel 
+
 app = FastAPI()
 db = Database()
  
-# Rotas para séries
-@app.post("/series/")
-def cadastrar_serie(serie: Serie):
+def executar_operacao_db(sql: str, params: tuple = None):
     db.conectar()
-    sql = "INSERT INTO serie (titulo, descricao, ano_lancamento, id_categoria) VALUES (%s, %s, %s, %s)"
-    db.executar_comando(sql, (serie.titulo, serie.descricao, serie.ano_lancamento, serie.id_categoria))
+    db.executar_comando(sql, params)
     db.desconectar()
-    return {"message": "Série cadastrada com sucesso"}
  
-@app.post("/atores/")
-def cadastrar_ator(ator: Ator):
+def executar_consulta_db(sql: str, params: tuple = None):
     db.conectar()
-    sql = "INSERT INTO ator (nome) VALUES (%s)"
-    db.executar_comando(sql, (ator.nome,))
+    resultados = db.executar_comando(sql, params)
     db.desconectar()
-    return {"message": "Ator cadastrado com sucesso"}
+    return resultados
  
-@app.post("/categorias/")
-def adicionar_categoria(categoria: Categoria):
-    db.conectar()
-    sql = "INSERT INTO categoria (nome) VALUES (%s)"
-    db.executar_comando(sql, (categoria.nome,))
-    db.desconectar()
-    return {"message": "Categoria adicionada com sucesso"}
+def rota_post(app: FastAPI, path: str, model: Type[BaseModel], table_name: str):
+    @app.post(path)
+    def criar_item(item: model):
+        campos = ", ".join(item.dict().keys())
+        valores = ", ".join(["%s"] * len(item.dict()))
+        sql = f"INSERT INTO {table_name} ({campos}) VALUES ({valores})"
+        executar_operacao_db(sql, tuple(item.dict().values()))
+        return {"saída": f"{table_name.capitalize()} cadastrado com sucesso"}
+    return criar_item
  
-@app.post("/atores/{id_ator}/series/{id_serie}")
-def associar_ator_serie(id_ator: int, id_serie: int, personagem: str):
-    db.conectar()
-    sql = "INSERT INTO ator_serie (id_ator, id_serie, personagem) VALUES (%s, %s, %s)"
-    db.executar_comando(sql, (id_ator, id_serie, personagem))
-    db.desconectar()
-    return {"message": "Ator associado à série com sucesso"}
+def rota_get(app: FastAPI, path: str, table_name: str):
+    @app.get(path)
+    def listar_itens():
+        sql = f"SELECT * FROM {table_name}"
+        return executar_consulta_db(sql)
+    return listar_itens
  
-@app.post("/motivos/")
-def incluir_motivo(motivo: Motivo):
-    db.conectar()
-    sql = "INSERT INTO motivo_assistir (id_serie, motivo_assistir) VALUES (%s, %s)"
-    db.executar_comando(sql, (motivo.id_serie, motivo.motivo))
-    db.desconectar()
-    return {"message": "Motivo incluído com sucesso"}
+def rota_update(app: FastAPI, path: str, model: Type[BaseModel], table_name: str, id_field: str):
+    @app.put(path)
+    def atualizar_item(item_id: int, item: model):
+        updates = ", ".join([f"{key} = %s" for key in item.dict().keys()])
+        sql = f"UPDATE {table_name} SET {updates} WHERE {id_field} = %s"
+        executar_operacao_db(sql, tuple(list(item.dict().values()) + [item_id]))
+        return {"saída": f"{table_name.capitalize()} atualizado com sucesso"}
+    return atualizar_item
  
-@app.post("/avaliacoes/")
-def avaliar_serie(avaliacao: Avaliacao):
-    db.conectar()
-    sql = "INSERT INTO avaliacao_serie (id_serie, nota, comentario) VALUES (%s, %s, %s)"
-    db.executar_comando(sql, (avaliacao.id_serie, avaliacao.nota, avaliacao.comentario))
-    db.desconectar()
-    return {"message": "Avaliação registrada com sucesso"}
+def rota_delete(app: FastAPI, path: str, table_name: str, id_field: str):
+    @app.delete(path)
+    def deletar_item(item_id: int):
+        sql = f"DELETE FROM {table_name} WHERE {id_field} = %s"
+        executar_operacao_db(sql, (item_id,))
+        return {"saída": f"{table_name.capitalize()} deletado com sucesso"}
+    return deletar_item
  
-@app.get("/series/")
-def listar_series():
-    db.conectar()
-    sql = "SELECT * FROM serie"
-    series = db.executar_comando(sql)
-    db.desconectar()
-    return series
+
+adicionar_serie = rota_post(app, "/series/", Serie, "serie")
+listar_series = rota_get(app, "/series/", "serie")
+atualizar_serie = rota_update(app, "/update_serie/{id}", Serie, "serie", "id")
+deletar_serie = rota_delete(app, "/delete_serie/{id}", "serie", "id")
  
-@app.get("/atores/")
-def listar_atores():
-    db.conectar()
-    sql = "SELECT * FROM ator"
-    autores = db.executar_comando(sql)
-    db.desconectar()
-    return autores
+adicionar_autor = rota_post(app, "/atores/", Ator, "ator")  
+listar_atores = rota_get(app, "/atores/", "ator")  
+atualizar_autor = rota_update(app, "/update_ator/{id}", Ator, "ator", "id")  
+deletar_autor = rota_delete(app, "/delete_ator/{id}", "ator", "id")  
  
-# Rotas para categorias
-@app.get("/categorias/")
-def listar_categorias():
-    db.conectar()
-    sql = "SELECT * FROM categoria"
-    categorias = db.executar_comando(sql)
-    db.desconectar()
-    return categorias
+adicionar_categoria = rota_post(app, "/categorias/", Categoria, "categoria")
+listar_categorias = rota_get(app, "/categorias/", "categoria")
+atualizar_categoria = rota_update(app, "/update_categoria/{id}", Categoria, "categoria", "id")  
+deletar_categoria = rota_delete(app, "/delete_categoria/{id}", "categoria", "id")  
  
+adicionar_motivo_pessoal = rota_post(app, "/motivos/", Motivo, "motivo_assistir")
+listar_motivos = rota_get(app, "/motivos/", "motivo_assistir")
+atualizar_motivo = rota_update(app, "/update_motivo/{id}", Motivo, "motivo_assistir", "id")  
+deletar_motivo = rota_delete(app, "/delete_motivo/{id}", "motivo_assistir", "id")  
  
-@app.get("/avaliacoes/")
-def listar_avaliacoes():
-    db.conectar()
-    sql = "SELECT * FROM avaliacao_serie"
-    avaliacoes = db.executar_comando(sql)
-    db.desconectar()
-    return avaliacoes
+adicionar_avaliacao = rota_post(app, "/avaliacoes/", Avaliacao, "avaliacao_serie")
+listar_avaliacoes = rota_get(app, "/avaliacoes/", "avaliacao_serie")
+atualizar_avaliacao = rota_update(app, "/update_avaliacao/{id}", Avaliacao, "avaliacao_serie", "id")  
+deletar_avaliacao = rota_delete(app, "/delete_avaliacao/{id}", "avaliacao_serie", "id")  
+ 
 
-@app.get("/motivos/")
-def listar_motivos():
-    db.conectar()
-    sql = "SELECT * FROM motivo_assistir"
-    motivos = db.executar_comando(sql)
-    db.desconectar()
-    return motivos
-
-@app.get("/series/{id_serie}")  
-def listar_associacao(id_serie: int):
-    db.conectar()
-    sql = "SELECT * FROM ator_serie WHERE id = %s"
-    atores = db.executar_comando(sql, (id_serie,))
-    db.desconectar()
-    return atores
-
-@app.delete("/atores/{id_ator}")
-def deletar_ator(id_ator: int):
-    db.conectar()
-    sql = "DELETE FROM ator WHERE id = %s"
-    db.executar_comando(sql, (id_ator,))
-    db.desconectar()
-    return {"message": "Ator deletado com sucesso"}
-
-@app.delete("/series/{id_serie}")
-def deletar_serie(id_serie: int):
-    db.conectar()
-    sql = "DELETE FROM serie WHERE id = %s"
-    db.executar_comando(sql, (id_serie,))
-    db.desconectar()
-    return {"message": "Série deletada com sucesso"}
-
-@app.delete("/categorias/{id_categoria}")
-def deletar_categoria(id_categoria: int):
-    db.conectar()
-    sql = "DELETE FROM categoria WHERE id = %s"
-    db.executar_comando(sql, (id_categoria,))
-    db.desconectar()
-    return {"message": "Categoria deletada com sucesso"}
-
-@app.delete("/avaliacoes/{id_avaliacao}")
-def deletar_avaliacao(id_avaliacao: int):
-    db.conectar()
-    sql = "DELETE FROM avaliacao_serie WHERE id = %s"
-    db.executar_comando(sql, (id_avaliacao,))
-    db.desconectar()
-    return {"message": "Avaliação deletada com sucesso"}
-
-@app.delete("/motivos/{id_motivo}")
-def deletar_motivo(id_motivo: int):
-    db.conectar()
-    sql = "DELETE FROM motivo_assistir WHERE id = %s"
-    db.executar_comando(sql, (id_motivo,))
-    db.desconectar()
-    return {"message": "Motivo deletado com sucesso"}
-
-@app.delete("/atores/{id_ator}/series/{id_serie}")
-def deletar_associacao(id_ator: int, id_serie: int):
-    db.conectar()
-    sql = "DELETE FROM ator_serie WHERE id_ator = %s AND id_serie = %s"
-    db.executar_comando(sql, (id_ator, id_serie))
-    db.desconectar()
-    return {"message": "Associação entre ator e série deletada com sucesso"}
-
-@app.put("/series/{id_serie}")
-def atualizar_serie(id_serie: int, serie: Serie):
-    db.conectar()
-    sql = "UPDATE serie SET titulo = %s, descricao = %s, ano_lancamento = %s, id_categoria = %s WHERE id = %s"
-    db.executar_comando(sql, (serie.titulo, serie.descricao, serie.ano_lancamento, serie.id_categoria, id_serie))
-    db.desconectar()
-    return {"message": "Série atualizada com sucesso"}
-
-@app.put("/atores/{id_ator}")
-def atualizar_ator(id_ator: int, ator: Ator):
-    db.conectar()
-    sql = "UPDATE ator SET nome = %s WHERE id = %s"
-    db.executar_comando(sql, (ator.nome, id_ator))
-    db.desconectar()
-    return {"message": "Ator atualizado com sucesso"}
-
-@app.put("/categorias/{id_categoria}")
-def atualizar_categoria(id_categoria: int, categoria: Categoria):
-    db.conectar()
-    sql = "UPDATE categoria SET nome = %s WHERE id = %s"
-    db.executar_comando(sql, (categoria.nome, id_categoria))
-    db.desconectar()
-    return {"message": "Categoria atualizada com sucesso"}
-
-@app.put("/avaliacoes/{id_avaliacao}")
-def atualizar_avaliacao(id_avaliacao: int, avaliacao: Avaliacao):
-    db.conectar()
-    sql = "UPDATE avaliacao_serie SET id_serie = %s, nota = %s, comentario = %s WHERE id = %s"
-    db.executar_comando(sql, (avaliacao.id_serie, avaliacao.nota, avaliacao.comentario, id_avaliacao))
-    db.desconectar()
-    return {"message": "Avaliação atualizada com sucesso"}
-
-@app.put("/motivos/{id_motivo}")
-def atualizar_motivo(id_motivo: int, motivo: Motivo):
-    db.conectar()
-    sql = "UPDATE motivo_assistir SET id_serie = %s, motivo_assistir = %s WHERE id = %s"
-    db.executar_comando(sql, (motivo.id_serie, motivo.motivo, id_motivo))
-    db.desconectar()
-    return {"message": "Motivo atualizado com sucesso"}
-
-@app.put("/atores/{id_ator}/series/{id_serie}")
-def atualizar_associacao(id_ator: int, id_serie: int, personagem: str):
-    db.conectar()
-    sql = "UPDATE ator_serie SET personagem = %s WHERE id_ator = %s AND id_serie = %s"
-    db.executar_comando(sql, (personagem, id_ator, id_serie))
-    db.desconectar()
-    return {"message": "Associação entre ator e série atualizada com sucesso"}
+@app.get("/ator/{id}/series/")
+def listar_serie_e_ator_relacionados(id: int):
+    sql = """
+        SELECT s.id, s.titulo, s.descricao, s.ano_lancamento
+        FROM serie s
+        JOIN ator_serie as ON s.id = as.id_serie
+        WHERE as.id_ator = %s
+    """
+    return executar_consulta_db(sql, (id,))
+ 
+@app.post("/ator/{id_ator}/series/{id_serie}")
+def associar_ator_serie(id_ator: int, id_serie: int):
+   
+    sql_ator = "SELECT COUNT(*) FROM ator WHERE id = %s"
+    ator_count = executar_consulta_db(sql_ator, (id_ator,))
+    if ator_count[0]['COUNT(*)'] == 0:
+        raise HTTPException(status_code=404, detail="Ator não encontrado")
+   
+    sql_serie = "SELECT COUNT(*) FROM serie WHERE id = %s"
+    serie_count = executar_consulta_db(sql_serie, (id_serie,))
+    if serie_count[0]['COUNT(*)'] == 0:
+        raise HTTPException(status_code=404, detail="Série não encontrada")
+   
+    sql_insert = "INSERT INTO ator_serie (id_ator, id_serie) VALUES (%s, %s)"
+    executar_operacao_db(sql_insert, (id_ator, id_serie))
+    return {"saída": "Ator associado à série com sucesso"}
