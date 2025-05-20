@@ -57,10 +57,10 @@ listar_series = rota_get(app, "/series/", "serie")
 atualizar_serie = rota_update(app, "/update_serie/{id}", Serie, "serie", "id")
 deletar_serie = rota_delete(app, "/delete_serie/{id}", "serie", "id")
  
-adicionar_autor = rota_post(app, "/atores/", Ator, "ator")  
+adicionar_ator = rota_post(app, "/atores/", Ator, "ator")  
 listar_atores = rota_get(app, "/atores/", "ator")  
-atualizar_autor = rota_update(app, "/update_ator/{id}", Ator, "ator", "id")  
-deletar_autor = rota_delete(app, "/delete_ator/{id}", "ator", "id")  
+atualizar_ator = rota_update(app, "/update_ator/{id}", Ator, "ator", "id")  
+deletar_ator = rota_delete(app, "/delete_ator/{id}", "ator", "id")  
  
 adicionar_categoria = rota_post(app, "/categorias/", Categoria, "categoria")
 listar_categorias = rota_get(app, "/categorias/", "categoria")
