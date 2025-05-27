@@ -1,10 +1,10 @@
-# from typing import Optional
+from typing import Optional
 from pydantic import BaseModel 
 
 class Serie(BaseModel):
     titulo: str
-    descricao: str | None
-    ano_lancamento: int | None
+    descricao: Optional[str]
+    ano_lancamento: Optional[int]
     id_categoria: int
 
 class Ator(BaseModel):
@@ -17,7 +17,11 @@ class Motivo(BaseModel):
 class Avaliacao(BaseModel):
     id_serie: int
     nota: int
-    comentario: str | None
+    comentario: Optional[str]
 
 class Categoria(BaseModel):
     nome: str
+
+class Ator_serie(BaseModel):
+    id_serie: int
+    id_ator: int

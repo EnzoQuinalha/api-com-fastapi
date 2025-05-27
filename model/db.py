@@ -1,4 +1,4 @@
-from typing import Any, Optional, Tuple, Union, List
+from typing import Any, Optional, Tuple, List
 import mysql.connector as mc #Biblioteca do conector do MySQL
 from mysql.connector import Error, MySQLConnection #Importando a classe Error para tratar as mensagens de erro do código
 from dotenv import load_dotenv #Importando a função load_dotenv
@@ -12,7 +12,7 @@ class Database:
         self.password: str = getenv('DB_PSWD')
         self.database: str = getenv('DB_NAME')
         self.connection: Optional[MySQLConnection] = None #Inicialização da conexão
-        self.cursor: Union[List[dict], None] = None #Inicialização do cursor
+        self.cursor: Optional[List[dict]] = None #Inicialização do cursor
  
     def conectar(self) -> None:
         """Estabelece uma conexão com o banco de dados."""
@@ -39,23 +39,29 @@ class Database:
             self.connection.close()
         print("Conexão com o banco de dados encerrada com sucesso;")
    
-    def executar_comando(self, sql: str, params: Optional[Tuple[Any, ...]] = None) -> Optional[Union[List[dict], Any]]:
+    def executar_comando(self, sql: str, params: Optional[Tuple[Any, ...]] = None) -> Optional[Optional[List[dict]]]:
         """
         Executa um comando no banco de dados. Pode ser usado para consultas (SELECT) ou modificações (INSERT, UPDATE, DELETE).
         sql: Comando SQL a ser executado.
         params: Parâmetros opcionais para o comando SQL.
-        return: Resultados da consulta ou o cursor. Retorna None em caso de erro.
+        return: Resultados da consulta ou o número de linhas afetadas. Retorna None em caso de erro.
         """
-        if self.connection is None or self.cursor is None:
+        if self.connection is None:
             print('Conexão ao banco de dados não estabelecida.')
             return None
+        cursor = self.connection.cursor(dictionary=True)
         try:
-            self.cursor.execute(sql, params)
-            if sql.upper().startswith("SELECT"):
-                return self.cursor.fetchall()  # Retorna os resultados da consulta
+            cursor.execute(sql, params)
+            if sql.strip().lower().startswith("select"):
+                resultado = cursor.fetchall()
+                return resultado
             else:
-                self.connection.commit()  # Confirma alterações no banco
-                return self.cursor  # Retorna o cursor para operações como INSERT, UPDATE, DELETE
+                self.connection.commit()
+                return cursor.rowcount
         except Error as e:
             print(f'Erro de execução: {e}')
             return None
+        finally:
+            cursor.close()
+
+    
